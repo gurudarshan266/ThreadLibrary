@@ -17,6 +17,7 @@ class DThread
 {
 public:
 	DThread(void(*start_funct)(void *), void *args);
+	DThread(ucontext_t* uc);
 
 	int GetTid() { return mTid; }
 	ucontext_t& GetContext() { return mCtxt; };
@@ -35,6 +36,8 @@ public:
 	bool IsTerminated() { return mTerminated; }
 	void SetTerminated(bool val) { mTerminated = val; }
 
+	void ClearStack();
+
 	static int NumOfThds;
 	static ucontext_t* sSuccessorCtxt;
 	static ucontext_t* GetSuccessorCtxt();
@@ -44,10 +47,12 @@ public:
 private:
 	int mTid;
 	ucontext_t mCtxt;
+	ucontext_t mExitCtxt;
 	std::vector<DThread*> mChildren;
 	std::vector<DThread*> mWaitedByThds;
 	bool mTerminated;
 	char mStack[STACK_SIZE];
+	char mExitStack[512];
 
 
 };

@@ -9,24 +9,48 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "mythread.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+	#include "mythread.h"
+
+#ifdef __cplusplus
+}
+#endif
+
+
 #include "DThread.h"
 
-int DThread::NumOfThds = 1;
+int DThread::NumOfThds = 0;
 ucontext_t* DThread::sSuccessorCtxt = NULL;
 
 DThread::DThread(void(*start_funct)(void *), void *args) : mWaitingOnThds(0), mTerminated(false)
 {
+//	mStack = new char[STACK_SIZE];
+//	mExitStack = new char[1];
+
+
+	//Allocation for exit-call context
+	getcontext(&mExitCtxt);
+	mExitCtxt.uc_stack.ss_sp = mExitStack;
+	mExitCtxt.uc_stack.ss_size = sizeof mExitStack;
+	makecontext(&mExitCtxt, MyThreadExit,0);
+
+	//Allocation for context
 	getcontext(&mCtxt);
 	mCtxt.uc_stack.ss_sp = mStack;
 	mCtxt.uc_stack.ss_size = sizeof mStack;
-	mCtxt.uc_link = DThread::GetSuccessorCtxt();
-	//TODO: Add code for handling args
-    makecontext(&mCtxt, (void (*)())start_funct, 0);
+	mCtxt.uc_link = &mExitCtxt;
+    makecontext(&mCtxt, (void (*)())start_funct,1, args);
 
-    mTid = NumOfThds++;
+    mTid = ++NumOfThds;
+}
 
-
+DThread::DThread(ucontext* uc) : mWaitingOnThds(0), mTerminated(false), mCtxt(*uc)
+{
+	mTid = ++NumOfThds;
 }
 
 void DThread::SetResumePoint(DThread& t)
@@ -56,3 +80,7 @@ bool DThread::HasChild(DThread* t)
 	return false;
 }
 
+void DThread::ClearStack()
+{
+//	delete mStack;
+}

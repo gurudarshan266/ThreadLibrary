@@ -8,7 +8,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <iostream>
+#include <sstream>
 #include <queue>
+#include <string>
 #include <vector>
 #include <ucontext.h>
 
@@ -32,6 +34,11 @@ queue<DThread*> Blocked;
 DThread* Running = NULL;
 queue<DThread*> Ready;
 
+ucontext* masterCtxt;
+DThread* masterThd;
+
+ostringstream sss;
+#define OUT sss
 /*
  * Creates a new thread
  * Adds it to the ready queue
@@ -47,7 +54,7 @@ MyThread MyThreadCreate (void(*start_funct)(void *), void *args)
 
 //	setcontext(&thd->GetContext());
 
-	cout<<"Added new Thread "<<thd->GetTid()<<" to Ready queue"<<endl;
+	OUT<<"Added new Thread "<<thd->GetTid()<<" to Ready queue"<<endl;
 	return (MyThread)thd;
 }
 
@@ -65,7 +72,7 @@ void MyThreadYield(void)
 		Ready.pop();
 		Ready.push(prev);
 
-		cout<<"Switching to Thread "<<prev->GetTid()<<" from Thread "<<Running->GetTid()<<endl;
+		OUT<<"Switching to Thread "<<prev->GetTid()<<" from Thread "<<Running->GetTid()<<endl;
 		swapcontext(&prev->GetContext(), &Running->GetContext());
 	}
 
@@ -84,14 +91,14 @@ int MyThreadJoin(MyThread thread)
 	//If the given thread is not a immediate child, then return error
 	if(!cur->HasChild(thdToWaitOn))
 	{
-		cout<<"Thread "<<thdToWaitOn->GetTid()<<" is not a child of Thread "<<cur->GetTid()<<endl;
+		OUT<<"Thread "<<thdToWaitOn->GetTid()<<" is not a child of Thread "<<cur->GetTid()<<endl;
 		return 0;
 	}
 
 	//If the child thread has already terminated, return error and do not block
 	if(thdToWaitOn->IsTerminated())
 	{
-		cout<<"Thread "<<thdToWaitOn->GetTid()<<" is already terminated. So not blocking Thread "<<cur->GetTid()<<endl;
+		OUT<<"Thread "<<thdToWaitOn->GetTid()<<" is already terminated. So not blocking Thread "<<cur->GetTid()<<endl;
 		return -1;
 	}
 
@@ -128,7 +135,7 @@ void MyThreadJoinAll(void)
 	//Checking if atleast one child is alive
 	if(cur->mWaitingOnThds == 0)
 	{
-		cout<<"All children threads are terminated. So not blocking Thread "<<cur->GetTid()<<endl;
+		OUT<<"All children threads are terminated. So not blocking Thread "<<cur->GetTid()<<endl;
 		return;
 	}
 
@@ -141,6 +148,9 @@ void MyThreadExit()
 {
 	DThread* cur = Running;
 
+	if(cur->IsTerminated())
+		OUT<<"Clean up not required for Thread "<<cur->GetTid()<<endl;
+
 	vector<DThread*>& WaitedbyThds = cur->GetWaitedByThreads();
 
 	for(int i=0; i< WaitedbyThds.size(); i++)
@@ -150,25 +160,49 @@ void MyThreadExit()
 
 		if(WaitedbyThds[i]->mWaitingOnThds == 0)
 		{
-			cout<<"Thread "<<WaitedbyThds[i]->GetTid()<<" is not waiting on anymore threads. Added to ready queue"<<endl;
+			OUT<<"Thread "<<WaitedbyThds[i]->GetTid()<<" is not waiting on anymore threads. Added to ready queue"<<endl;
 			Ready.push(WaitedbyThds[i]);
 		}
 	}
 
 	cur->SetTerminated(true);
+	cur->ClearStack();
 
-	cout<<"Killing Thread "<<cur->GetTid()<<endl;
+	OUT<<"Killing Thread "<<cur->GetTid()<<endl;
+
+	//Forcing MyThreadSwitch to use setcontext
+	Running = NULL;
 
 	MyThreadSwitch();
 }
 
-void MyThreadInit(void(*start_funct)(void *), void *args)
+void MyThreadInitd(void(*start_funct)(void *), void *args)
 {
 	DThread* t = (DThread*) MyThreadCreate(start_funct,args);
 
 	MyThreadSwitch();
 //	MyThreadJoinAll();
+}
 
+void MyThreadInit(void(*start_funct)(void *), void *args)
+{
+	masterCtxt = new ucontext_t();
+	masterThd = new DThread(masterCtxt);
+	OUT<<"Master thread created with TID = "<<masterThd->GetTid()<<endl;
+//	getcontext(masterCtxt);
+
+	DThread* t = (DThread*) MyThreadCreate(start_funct,args);
+
+	masterThd->AddChildren(t);
+
+	Running = masterThd;
+	masterThd->mWaitingOnThds++;
+	t->AddToWaitedByList(masterThd);
+
+
+	MyThreadSwitch();
+	OUT<<"After Thd Switch"<<endl;
+//	MyThreadJoinAll();
 }
 
 void MyThreadSwitch()
@@ -177,7 +211,8 @@ void MyThreadSwitch()
 
 	if(Ready.empty())
 	{
-		cout<<"Ready queue is empty"<<endl;
+		OUT<<"Ready queue is empty"<<endl;
+//		return;
 		exit(-1);
 	}
 
