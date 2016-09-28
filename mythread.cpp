@@ -42,7 +42,7 @@ DThread* masterThd;
 ostringstream sss;
 #define OUT sss
 
-#define OUT2 cout
+#define OUT2 sss
 /*
  * Creates a new thread
  * Adds it to the ready queue
@@ -254,7 +254,7 @@ void MySemaphoreSignal(MySemaphore sem)
 	DSemaphore* s = (DSemaphore*)sem;
 
 	//If semaphore has 0, remove from blocking queue (if any) and add it to ready queue
-	if(s->mValue <= 0)
+	if(s->mValue == 0)
 	{
 		OUT2<<"Thread "<<Running->GetTid()<<" released Semaphore "<<s->GetSid()<<endl;
 

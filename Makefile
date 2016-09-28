@@ -1,2 +1,3 @@
 all:
-	gcc -g extraTest.c DThread.cpp DSemaphore.cpp -lstdc++ 
+	gcc -g -c mythread.cpp DThread.cpp DSemaphore.cpp -lstdc++ 
+	ar rcs gpollep.a mythread.o DThread.o DSemaphore.o
