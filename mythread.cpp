@@ -23,6 +23,7 @@ extern "C" {
 #endif
 
 	#include "mythread.h"
+	#include "mythreadextra.h"
 
 #ifdef __cplusplus
 }
@@ -176,7 +177,7 @@ void MyThreadExit()
 	MyThreadSwitch();
 }
 
-void MyThreadInitd(void(*start_funct)(void *), void *args)
+void MyThreadInit(void(*start_funct)(void *), void *args)
 {
 	DThread* t = (DThread*) MyThreadCreate(start_funct,args);
 
@@ -184,7 +185,7 @@ void MyThreadInitd(void(*start_funct)(void *), void *args)
 //	MyThreadJoinAll();
 }
 
-void MyThreadInit(void(*start_funct)(void *), void *args)
+int MyThreadInitExtra(void(*start_funct)(void *), void *args)
 {
 	masterCtxt = new ucontext_t();
 	masterThd = new DThread(masterCtxt);
@@ -196,11 +197,14 @@ void MyThreadInit(void(*start_funct)(void *), void *args)
 	masterThd->AddChildren(t);
 
 	Running = masterThd;
-	masterThd->mWaitingOnThds++;
-	t->AddToWaitedByList(masterThd);
-
-
-	MyThreadSwitch();
+	MyThreadJoin(t);
+//
+//	Running = masterThd;
+//	masterThd->mWaitingOnThds++;
+//	t->AddToWaitedByList(masterThd);
+//
+//
+//	MyThreadSwitch();
 	OUT<<"After Thd Switch"<<endl;
 //	MyThreadJoinAll();
 }
