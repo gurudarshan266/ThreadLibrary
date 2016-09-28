@@ -15,6 +15,7 @@
 #include <ucontext.h>
 
 #include "DThread.h"
+#include "DSemaphore.h"
 
 using namespace std;
 
@@ -40,10 +41,15 @@ DThread* masterThd;
 
 ostringstream sss;
 #define OUT sss
+
+#define OUT2 cout
 /*
  * Creates a new thread
  * Adds it to the ready queue
  */
+
+ucontext_t* x;
+
 MyThread MyThreadCreate (void(*start_funct)(void *), void *args)
 {
 	DThread* thd = new DThread(start_funct, args);
@@ -177,7 +183,7 @@ void MyThreadExit()
 	MyThreadSwitch();
 }
 
-void MyThreadInit(void(*start_funct)(void *), void *args)
+void MyThreadInit2(void(*start_funct)(void *), void *args)
 {
 	DThread* t = (DThread*) MyThreadCreate(start_funct,args);
 
@@ -185,12 +191,19 @@ void MyThreadInit(void(*start_funct)(void *), void *args)
 //	MyThreadJoinAll();
 }
 
-int MyThreadInitExtra(void(*start_funct)(void *), void *args)
+void MyThreadInit(void(*start_funct)(void *), void *args)
 {
+#if 0
+	//Allocation for exit-call context
+	getcontext(exitCtxt);
+	mExitCtxt.uc_stack.ss_sp = exitStack;
+	mExitCtxt.uc_stack.ss_size = sizeof mExitStack;
+	makecontext(&mExitCtxt, MyThreadExit,0);
+#endif
+
 	masterCtxt = new ucontext_t();
 	masterThd = new DThread(masterCtxt);
 	OUT<<"Master thread created with TID = "<<masterThd->GetTid()<<endl;
-//	getcontext(masterCtxt);
 
 	DThread* t = (DThread*) MyThreadCreate(start_funct,args);
 
@@ -198,15 +211,15 @@ int MyThreadInitExtra(void(*start_funct)(void *), void *args)
 
 	Running = masterThd;
 	MyThreadJoin(t);
-//
-//	Running = masterThd;
-//	masterThd->mWaitingOnThds++;
-//	t->AddToWaitedByList(masterThd);
-//
-//
-//	MyThreadSwitch();
-	OUT<<"After Thd Switch"<<endl;
-//	MyThreadJoinAll();
+	OUT<<"After End of Thd Switch"<<endl;
+}
+
+int MyThreadInitExtra(void)
+{
+	masterCtxt = new ucontext_t();
+	masterThd = new DThread(masterCtxt);
+	Running = masterThd;
+	OUT<<"Master thread created with TID = "<<masterThd->GetTid()<<endl;
 }
 
 void MyThreadSwitch()
@@ -230,8 +243,74 @@ void MyThreadSwitch()
 		swapcontext(&cur->GetContext(), &Running->GetContext());
 }
 
-void HouseKeeping()
+MySemaphore MySemaphoreInit(int initialValue)
 {
+	DSemaphore* s = new DSemaphore(initialValue);
+	return (MySemaphore)s;
+}
+
+void MySemaphoreSignal(MySemaphore sem)
+{
+	DSemaphore* s = (DSemaphore*)sem;
+
+	//If semaphore has 0, remove from blocking queue (if any) and add it to ready queue
+	if(s->mValue <= 0)
+	{
+		OUT2<<"Thread "<<Running->GetTid()<<" released Semaphore "<<s->GetSid()<<endl;
+
+		std::queue<DThread*>& queue = s->GetWaitingQ();
+
+		if(!queue.empty())
+		{
+			DThread* t = queue.front();
+			queue.pop();
+
+			Ready.push(t);
+			OUT2<<"Tranferred Thread "<<t->GetTid()<<" from Semaphore "<<s->GetSid()<<" Blocked queue to Ready queue"<<endl;
+		}
+		else//If Blocked queue is empty, then increment the semaphore value
+		{
+			s->mValue++;
+		}
+
+	}
+	else
+	{
+		s->mValue++;
+	}
+
+}
+
+void MySemaphoreWait(MySemaphore sem)
+{
+	DSemaphore* s = (DSemaphore*)sem;
+	DThread* cur = Running;
+
+	//If semaphore has 0, add to blocking queue and switch the thread (from ready queue)
+	if(s->mValue <= 0)
+	{
+		OUT2<<"Thread "<<cur->GetTid()<<" is blocked on Semaphore "<<s->GetSid()<<endl;
+		s->AddToWaitingQ(cur);
+		MyThreadSwitch();
+	}
+	else
+	{
+		s->mValue--;
+	}
+}
+
+int MySemaphoreDestroy(MySemaphore sem)
+{
+	DSemaphore* s = (DSemaphore*)sem;
+
+	if(!s->GetWaitingQ().empty())
+	{
+		OUT2<<"Semaphore "<<s->GetSid()<<" has non-empty waiting queue. So not destroying it"<<endl;
+		return -1;
+	}
+
+	delete s;
+	return 0;
 }
 
 

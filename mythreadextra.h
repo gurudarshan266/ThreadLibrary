@@ -43,7 +43,7 @@ int MySemaphoreDestroy(MySemaphore sem);
 // Create and run the "main" thread
 void MyThreadInit(void(*start_funct)(void *), void *args);
 
-int MyThreadInitExtra(void(*start_funct)(void *), void *args);
+int MyThreadInitExtra();
 
 
 #endif /* MYTHREADEXTRA_H_ */
