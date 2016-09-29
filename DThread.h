@@ -11,6 +11,17 @@
 #include <ucontext.h>
 #include <vector>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+	#include "mythread.h"
+
+#ifdef __cplusplus
+}
+#endif
+
+
 #define STACK_SIZE (1<<13) //8K
 
 class DThread
@@ -18,6 +29,7 @@ class DThread
 public:
 	DThread(void(*start_funct)(void *), void *args);
 	DThread(ucontext_t* uc);
+	DThread(void(*start_funct)(void *), void *args, ucontext_t* exitCtxt);
 
 	int GetTid() { return mTid; }
 	ucontext_t& GetContext() { return mCtxt; };

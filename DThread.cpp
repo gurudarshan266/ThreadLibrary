@@ -32,11 +32,13 @@ DThread::DThread(void(*start_funct)(void *), void *args) : mWaitingOnThds(0), mT
 //	mExitStack = new char[1];
 
 
+
 	//Allocation for exit-call context
 	getcontext(&mExitCtxt);
 	mExitCtxt.uc_stack.ss_sp = mExitStack;
 	mExitCtxt.uc_stack.ss_size = sizeof mExitStack;
 	makecontext(&mExitCtxt, MyThreadExit,0);
+
 
 	//Allocation for context
 	getcontext(&mCtxt);
@@ -48,8 +50,36 @@ DThread::DThread(void(*start_funct)(void *), void *args) : mWaitingOnThds(0), mT
     mTid = ++NumOfThds;
 }
 
+
+DThread::DThread(void(*start_funct)(void *), void *args, ucontext_t* exitCtxt) : mWaitingOnThds(0), mTerminated(false)
+{
+//	mStack = new char[STACK_SIZE];
+//	mExitStack = new char[1];
+
+
+
+	//Allocation for context
+	getcontext(&mCtxt);
+	mCtxt.uc_stack.ss_sp = mStack;
+	mCtxt.uc_stack.ss_size = sizeof mStack;
+	mCtxt.uc_link = exitCtxt;
+    makecontext(&mCtxt, (void (*)())start_funct,1, args);
+
+    mTid = ++NumOfThds;
+}
+
+
 DThread::DThread(ucontext* uc) : mWaitingOnThds(0), mTerminated(false), mCtxt(*uc)
 {
+
+	//Allocation for exit-call context
+	getcontext(&mExitCtxt);
+	mExitCtxt.uc_stack.ss_sp = mExitStack;
+	mExitCtxt.uc_stack.ss_size = sizeof mExitStack;
+	makecontext(&mExitCtxt, MyThreadExit,0);
+
+	mCtxt.uc_link = &mExitCtxt;
+
 	mTid = ++NumOfThds;
 }
 
