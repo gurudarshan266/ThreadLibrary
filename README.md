@@ -1,0 +1,2 @@
+# ThreadLibrary
+This is a non-preemptive user-level thread library (without using pthread libraries). The API was modelled after pthread library calls. The implementation is done using context switch system calls in Linux and context data was encapsulated into data structures which mirrored ucontext_t but with added OO functionality to support handling various thread states seamlessly. Semaphores and Mutex support was added to make it a fully functional library package that can be effortlessly integrated into any application code.
